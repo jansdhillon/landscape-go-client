@@ -131,6 +131,9 @@ type ScriptAttachment struct {
 	Id int `json:"id" tfsdk:"id"`
 }
 
+// ScriptAttachmentResult The contents of the specified script attachment.
+type ScriptAttachmentResult = string
+
 // ScriptCreator Information about the user who created the script.
 type ScriptCreator struct {
 	// Id The ID of the person who created the script.
@@ -258,6 +261,9 @@ type LegacyActionParam = string
 
 // LegacyVersionParam defines model for LegacyVersionParam.
 type LegacyVersionParam = string
+
+// ScriptAttachmentIdPathParam defines model for ScriptAttachmentIdPathParam.
+type ScriptAttachmentIdPathParam = int
 
 // ScriptIdPathParam defines model for ScriptIdPathParam.
 type ScriptIdPathParam = int
@@ -721,6 +727,9 @@ type ClientInterface interface {
 	// GetScript request
 	GetScript(ctx context.Context, scriptId ScriptIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetScriptAttachment request
+	GetScriptAttachment(ctx context.Context, scriptId ScriptIdPathParam, attachmentId ScriptAttachmentIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ArchiveScript request
 	ArchiveScript(ctx context.Context, scriptId ScriptIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -790,6 +799,18 @@ func (c *Client) LoginWithAccessKey(ctx context.Context, body LoginWithAccessKey
 
 func (c *Client) GetScript(ctx context.Context, scriptId ScriptIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetScriptRequest(c.Server, scriptId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetScriptAttachment(ctx context.Context, scriptId ScriptIdPathParam, attachmentId ScriptAttachmentIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetScriptAttachmentRequest(c.Server, scriptId, attachmentId)
 	if err != nil {
 		return nil, err
 	}
@@ -995,6 +1016,47 @@ func NewGetScriptRequest(server string, scriptId ScriptIdPathParam) (*http.Reque
 	return req, nil
 }
 
+// NewGetScriptAttachmentRequest generates requests for GetScriptAttachment
+func NewGetScriptAttachmentRequest(server string, scriptId ScriptIdPathParam, attachmentId ScriptAttachmentIdPathParam) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "script_id", runtime.ParamLocationPath, scriptId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "attachment_id", runtime.ParamLocationPath, attachmentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/scripts/%s/attachments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewArchiveScriptRequest generates requests for ArchiveScript
 func NewArchiveScriptRequest(server string, scriptId ScriptIdPathParam) (*http.Request, error) {
 	var err error
@@ -1122,6 +1184,9 @@ type ClientWithResponsesInterface interface {
 	// GetScriptWithResponse request
 	GetScriptWithResponse(ctx context.Context, scriptId ScriptIdPathParam, reqEditors ...RequestEditorFn) (*GetScriptResponse, error)
 
+	// GetScriptAttachmentWithResponse request
+	GetScriptAttachmentWithResponse(ctx context.Context, scriptId ScriptIdPathParam, attachmentId ScriptAttachmentIdPathParam, reqEditors ...RequestEditorFn) (*GetScriptAttachmentResponse, error)
+
 	// ArchiveScriptWithResponse request
 	ArchiveScriptWithResponse(ctx context.Context, scriptId ScriptIdPathParam, reqEditors ...RequestEditorFn) (*ArchiveScriptResponse, error)
 
@@ -1225,6 +1290,29 @@ func (r GetScriptResponse) StatusCode() int {
 	return 0
 }
 
+type GetScriptAttachmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ScriptAttachmentResult
+	JSON404      *ScriptNotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r GetScriptAttachmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetScriptAttachmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ArchiveScriptResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1321,6 +1409,15 @@ func (c *ClientWithResponses) GetScriptWithResponse(ctx context.Context, scriptI
 		return nil, err
 	}
 	return ParseGetScriptResponse(rsp)
+}
+
+// GetScriptAttachmentWithResponse request returning *GetScriptAttachmentResponse
+func (c *ClientWithResponses) GetScriptAttachmentWithResponse(ctx context.Context, scriptId ScriptIdPathParam, attachmentId ScriptAttachmentIdPathParam, reqEditors ...RequestEditorFn) (*GetScriptAttachmentResponse, error) {
+	rsp, err := c.GetScriptAttachment(ctx, scriptId, attachmentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetScriptAttachmentResponse(rsp)
 }
 
 // ArchiveScriptWithResponse request returning *ArchiveScriptResponse
@@ -1484,6 +1581,39 @@ func ParseGetScriptResponse(rsp *http.Response) (*GetScriptResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ScriptResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ScriptNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetScriptAttachmentResponse parses an HTTP response from a GetScriptAttachmentWithResponse call
+func ParseGetScriptAttachmentResponse(rsp *http.Response) (*GetScriptAttachmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetScriptAttachmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ScriptAttachmentResult
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
