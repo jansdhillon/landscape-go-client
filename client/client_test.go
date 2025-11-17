@@ -554,3 +554,111 @@ func TestArchiveAndRedactScript(t *testing.T) {
 		}
 	})
 }
+
+func TestGetScriptAttachment(t *testing.T) {
+	handler := http.NewServeMux()
+	handler.HandleFunc("/api/scripts/1/attachments/1", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode("file contents"); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
+	})
+	handler.HandleFunc("/api/scripts/99/attachments/1", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		if err := json.NewEncoder(w).Encode(map[string]any{"message": "not found"}); err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
+	})
+
+	server := httptest.NewTLSServer(handler)
+	defer server.Close()
+
+	httpClient := server.Client()
+
+	authEditor := func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "Bearer test-token")
+		return nil
+	}
+
+	baseURL := server.URL
+
+	t.Run("raw response", func(t *testing.T) {
+		client, err := NewClient(baseURL, WithHTTPClient(httpClient), WithRequestEditorFn(authEditor))
+		if err != nil {
+			t.Fatalf("failed to init client: %v", err)
+		}
+
+		resp, err := client.GetScriptAttachment(context.Background(), 1, 1)
+		if err != nil {
+			t.Fatalf("GetScriptAttachment failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected HTTP 200 but received %d", resp.StatusCode)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("failed to read body: %v", err)
+		}
+
+		var attachment string
+		if err := json.Unmarshal(body, &attachment); err != nil {
+			t.Fatalf("failed to decode attachment: %v", err)
+		}
+
+		if attachment != "file contents" {
+			t.Fatalf("unexpected attachment: %s", attachment)
+		}
+	})
+
+	t.Run("typed response", func(t *testing.T) {
+		client, err := NewClientWithResponses(baseURL, WithHTTPClient(httpClient), WithRequestEditorFn(authEditor))
+		if err != nil {
+			t.Fatalf("failed to init client with responses: %v", err)
+		}
+
+		resp, err := client.GetScriptAttachmentWithResponse(context.Background(), 1, 1)
+		if err != nil {
+			t.Fatalf("GetScriptAttachmentWithResponse failed: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			t.Fatalf("expected HTTP 200 but received %d", resp.StatusCode())
+		}
+
+		if resp.JSON200 == nil {
+			t.Fatal("expected JSON200 payload, got nil")
+		}
+
+		if *resp.JSON200 != "file contents" {
+			t.Fatalf("unexpected attachment payload: %s", *resp.JSON200)
+		}
+	})
+
+	t.Run("not found typed response", func(t *testing.T) {
+		client, err := NewClientWithResponses(baseURL, WithHTTPClient(httpClient), WithRequestEditorFn(authEditor))
+		if err != nil {
+			t.Fatalf("failed to init client with responses: %v", err)
+		}
+
+		resp, err := client.GetScriptAttachmentWithResponse(context.Background(), 99, 1)
+		if err != nil {
+			t.Fatalf("GetScriptAttachmentWithResponse failed: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusNotFound {
+			t.Fatalf("expected HTTP 404 but received %d", resp.StatusCode())
+		}
+
+		if resp.JSON404 == nil || resp.JSON404.Message == nil || *resp.JSON404.Message != "not found" {
+			t.Fatalf("unexpected 404 payload: %#v", resp.JSON404)
+		}
+	})
+}
