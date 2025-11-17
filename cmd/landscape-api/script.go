@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	codeFlag       = "code"
-	fileFlag       = "file"
-	scriptTypeFlag = "script-type"
-	titleFlag      = "title"
-	scriptIdFlag   = "script-id"
+	codeFlag               = "code"
+	fileFlag               = "file"
+	scriptTypeFlag         = "script-type"
+	titleFlag              = "title"
+	scriptIDFlag           = "script-id"
+	scriptAttachmentIDFlag = "script-attachment-id"
 )
 
 var scriptCmd = &cli.Command{
@@ -41,7 +42,7 @@ var scriptCmd = &cli.Command{
 				},
 				&cli.StringFlag{
 					Name:     scriptTypeFlag,
-					Aliases:  []string{"st", "script_type"},
+					Aliases:  []string{"s"},
 					Required: false,
 					Value:    "V1",
 				},
@@ -77,9 +78,8 @@ var scriptCmd = &cli.Command{
 			Usage: "Create or manage script attachments.",
 			Commands: []*cli.Command{
 				{
-					Name:      "create",
-					Usage:     "Create a script attachment.",
-					ArgsUsage: "[script-id]",
+					Name:  "create",
+					Usage: "Create a script attachment.",
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:     fileFlag,
@@ -87,8 +87,33 @@ var scriptCmd = &cli.Command{
 							Usage:    "The file you wish to use as an attachment. The format for this parameter is: <filename>$$<base64 encoded file contents>.",
 							Required: true,
 						},
+						&cli.Int64Flag{
+							Name:     scriptIDFlag,
+							Aliases:  []string{"s"},
+							Usage:    "The ID of the script you want to make attachment for.",
+							Required: true,
+						},
 					},
 					Action: createScriptAttachmentAction,
+				},
+				{
+					Name:   "get",
+					Usage:  "Get a script attachment by the script ID and the attachment ID.",
+					Action: getScriptAttachmentAction,
+					Flags: []cli.Flag{
+						&cli.Int64Flag{
+							Name:     scriptIDFlag,
+							Aliases:  []string{"s"},
+							Usage:    "The ID of the script you want to make attachment for.",
+							Required: true,
+						},
+						&cli.Int64Flag{
+							Name:     scriptAttachmentIDFlag,
+							Aliases:  []string{"i"},
+							Usage:    "The ID of the script attachment to get.",
+							Required: true,
+						},
+					},
 				},
 			},
 		},
@@ -182,28 +207,35 @@ func getScriptAction(ctx context.Context, cmd *cli.Command) error {
 	return WriteResponseToRoot(ctx, cmd, res)
 }
 
+func getScriptAttachmentAction(ctx context.Context, cmd *cli.Command) error {
+	api, ok := ctx.Value(apiClientKey).(*client.ClientWithResponses)
+	if !ok || api == nil {
+		return fmt.Errorf("api client not initialized")
+	}
+
+	scriptID := cmd.Int64(scriptIDFlag)
+	attachmentID := cmd.Int64(scriptAttachmentIDFlag)
+
+	res, err := api.GetScriptAttachment(ctx, int(scriptID), int(attachmentID))
+	if err != nil {
+		return fmt.Errorf("failed to get script attachment: %w", err)
+	}
+
+	return WriteResponseToRoot(ctx, cmd, res)
+}
+
 func createScriptAttachmentAction(ctx context.Context, cmd *cli.Command) error {
 	api, ok := ctx.Value(apiClientKey).(*client.ClientWithResponses)
 	if !ok || api == nil {
 		return fmt.Errorf("api client not initialized")
 	}
 
-	noArgs := cmd.Args().Len() == 0
-	scriptIDStr := cmd.Args().First()
-	if noArgs || scriptIDStr == "" {
-		return fmt.Errorf("script ID must be provided as the first argument")
-	}
-
-	scriptID, err := strconv.Atoi(scriptIDStr)
-	if err != nil {
-		return fmt.Errorf("couldn't convert script ID to string: %s", err)
-	}
-
+	scriptID := cmd.Int64(scriptIDFlag)
 	file := cmd.String(fileFlag)
 
 	params := client.LegacyActionParams("CreateScriptAttachment")
 	edit := client.EncodeQueryRequestEditor(url.Values{
-		"script_id": []string{strconv.Itoa(scriptID)},
+		"script_id": []string{fmt.Sprintf("%d", scriptID)},
 		"file":      []string{file},
 	})
 
