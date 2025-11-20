@@ -293,13 +293,18 @@ func TestInvokeLegacyAction(t *testing.T) {
 			t.Fatal("expected JSON200 payload, got nil")
 		}
 
-		script, err := resp.JSON200.AsV1Script()
+		script, err := resp.JSON200.AsScriptResult()
 		if err != nil {
 			t.Fatalf("failed to decode script from union: %v", err)
 		}
 
-		if script.Title != "new script" || script.Id != 42 {
-			t.Fatalf("unexpected script payload: %+v", script)
+		parsedScript, err := script.AsV1Script()
+		if err != nil {
+			t.Fatalf("failed to decode script from union: %v", err)
+		}
+
+		if parsedScript.Title != "new script" || parsedScript.Id != 42 {
+			t.Fatalf("unexpected script payload: %+v", parsedScript)
 		}
 	})
 
@@ -327,13 +332,18 @@ func TestInvokeLegacyAction(t *testing.T) {
 			t.Fatal("expected JSON200 payload, got nil")
 		}
 
-		script, err := resp.JSON200.AsV1Script()
+		script, err := resp.JSON200.AsScriptResult()
 		if err != nil {
 			t.Fatalf("failed to decode script from union: %v", err)
 		}
 
-		if script.Title != "edited title" {
-			t.Fatalf("unexpected script payload: %+v", script)
+		parsedScript, err := script.AsV1Script()
+		if err != nil {
+			t.Fatalf("failed to decode script from union: %v", err)
+		}
+
+		if parsedScript.Title != "edited title" {
+			t.Fatalf("unexpected script payload: %+v", parsedScript)
 		}
 	})
 
@@ -361,13 +371,18 @@ func TestInvokeLegacyAction(t *testing.T) {
 			t.Fatal("expected JSON200 payload, got nil")
 		}
 
-		script, err := resp.JSON200.AsV1Script()
+		script, err := resp.JSON200.AsScriptResult()
 		if err != nil {
 			t.Fatalf("failed to decode script from union: %v", err)
 		}
 
-		if script.Id != 99 || script.Title != "copy title" {
-			t.Fatalf("unexpected script payload: %+v", script)
+		parsedScript, err := script.AsV1Script()
+		if err != nil {
+			t.Fatalf("failed to decode script from union: %v", err)
+		}
+
+		if parsedScript.Id != 99 || parsedScript.Title != "copy title" {
+			t.Fatalf("unexpected script payload: %+v", parsedScript)
 		}
 	})
 

@@ -524,48 +524,22 @@ func (t *ScriptResult) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// AsV1Script returns the union data inside the LegacyActionResponse as a V1Script
-func (t LegacyActionResponse) AsV1Script() (V1Script, error) {
-	var body V1Script
+// AsScriptResult returns the union data inside the LegacyActionResponse as a ScriptResult
+func (t LegacyActionResponse) AsScriptResult() (ScriptResult, error) {
+	var body ScriptResult
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromV1Script overwrites any union data inside the LegacyActionResponse as the provided V1Script
-func (t *LegacyActionResponse) FromV1Script(v V1Script) error {
+// FromScriptResult overwrites any union data inside the LegacyActionResponse as the provided ScriptResult
+func (t *LegacyActionResponse) FromScriptResult(v ScriptResult) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeV1Script performs a merge with any union data inside the LegacyActionResponse, using the provided V1Script
-func (t *LegacyActionResponse) MergeV1Script(v V1Script) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsV2Script returns the union data inside the LegacyActionResponse as a V2Script
-func (t LegacyActionResponse) AsV2Script() (V2Script, error) {
-	var body V2Script
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromV2Script overwrites any union data inside the LegacyActionResponse as the provided V2Script
-func (t *LegacyActionResponse) FromV2Script(v V2Script) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeV2Script performs a merge with any union data inside the LegacyActionResponse, using the provided V2Script
-func (t *LegacyActionResponse) MergeV2Script(v V2Script) error {
+// MergeScriptResult performs a merge with any union data inside the LegacyActionResponse, using the provided ScriptResult
+func (t *LegacyActionResponse) MergeScriptResult(v ScriptResult) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err

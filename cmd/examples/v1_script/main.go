@@ -56,23 +56,21 @@ func main() {
 		log.Fatalf("failed to invoke legacy action: %v", err)
 	}
 
-	if createdScriptRes == nil {
-		log.Fatalf("legacy action returned nil response")
-	}
-
-	if createdScriptRes.StatusCode() != 200 {
-		log.Fatalf("legacy action failed: status=%d body=%s", createdScriptRes.StatusCode(), string(createdScriptRes.Body))
-	}
-
 	log.Printf("raw create script response: %s", createdScriptRes.Body)
-
 	if createdScriptRes.JSON200 == nil {
-		log.Fatalf("legacy action did not return a script object: %s", string(createdScriptRes.Body))
+		if createdScriptRes.JSON404 != nil {
+			log.Fatalf("error getting script: %s", createdScriptRes.Status())
+		}
 	}
 
-	createdScript, err := createdScriptRes.JSON200.AsV2Script()
+	script, err := createdScriptRes.JSON200.AsScriptResult()
 	if err != nil {
-		log.Fatalf("failed to convert returned script into V1 Script type: %v", err)
+		log.Fatalf("failed to parse response as script: %v", err)
+	}
+
+	createdScript, err := script.AsV1Script()
+	if err != nil {
+		log.Fatalf("failed to parse response as V1 script: %v", err)
 	}
 
 	editParams := client.LegacyActionParams("EditScript")
@@ -84,29 +82,23 @@ func main() {
 		"code":      []string{enc},
 	})
 
-	editedScriptRes, err := landscapeAPIClient.InvokeLegacyActionWithResponse(ctx, editParams, queryArgsEditorFn)
-
+	res, err := landscapeAPIClient.InvokeLegacyActionWithResponse(ctx, editParams, queryArgsEditorFn)
 	if err != nil {
 		log.Fatalf("failed to invoke legacy action: %v", err)
 	}
 
-	if editedScriptRes == nil {
-		log.Fatalf("legacy action returned nil response")
+	if res.JSON200 == nil {
+		log.Fatalf("failed to edit script: %s", res.Status())
 	}
-
-	if editedScriptRes.StatusCode() != 200 {
-		log.Fatalf("legacy action failed: status=%d body=%s", editedScriptRes.StatusCode(), string(editedScriptRes.Body))
-	}
-
-	log.Printf("raw edit script response: %s", editedScriptRes.Body)
-
-	if editedScriptRes.JSON200 == nil {
-		log.Fatalf("legacy action did not return a script object: %s", string(editedScriptRes.Body))
-	}
-
-	editedScript, err := editedScriptRes.JSON200.AsV1Script()
+	log.Printf("raw edit script response: %s", res.Body)
+	script, err = res.JSON200.AsScriptResult()
 	if err != nil {
-		log.Fatalf("failed to convert returned script into Script type: %v", err)
+		log.Fatalf("failed to parse response as script: %s", err)
+	}
+
+	editedScript, err := script.AsV1Script()
+	if err != nil {
+		log.Fatalf("failed to script as V1 script: %s", err)
 	}
 
 	log.Printf("edited script title: %s", editedScript.Title)
